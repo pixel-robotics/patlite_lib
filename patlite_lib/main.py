@@ -2,7 +2,7 @@ import socket
 import struct
 import sys
 
-_sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# _sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 PNS_PRODUCT_ID = b'AB'
 """product category"""
@@ -628,23 +628,23 @@ def main():
     argc = len(sys.argv)
     
     # Connect to LA-POE
-    socket_open('192.168.10.1', 10000)
+    sock = socket_open('192.168.10.1', 10000)
 
     try:
         if args[1] == 'T':
             # smart mode control command
             if argc >= 3:
-                pns_smart_mode_command(int(args[2]))
+                pns_smart_mode_command(int(args[2]), sock)
 
         elif args[1] == 'M':
             # mute command
             if argc >= 3:
-                pns_mute_command(int(args[2]))
+                pns_mute_command(int(args[2]), sock)
 
         elif args[1] == 'P':
             # stop/pulse input command
             if argc >= 3:
-                pns_stop_pulse_input_command(int(args[2]))
+                pns_stop_pulse_input_command(int(args[2]), sock)
 
         elif args[1] == 'S':
             # operation control command
@@ -657,7 +657,7 @@ def main():
                     int(args[6]),
                     int(args[7]),
                 )
-                pns_run_control_command(run_control_data)
+                pns_run_control_command(run_control_data, sock)
 
         elif args[1] == 'D':
             # detailed operation control command
@@ -671,20 +671,20 @@ def main():
                     int(args[7]),
                     int(args[8]),
                 )
-                pns_detail_run_control_command(detail_run_control_data)
+                pns_detail_run_control_command(detail_run_control_data, sock)
 
         elif args[1] == 'C':
             # clear command
-            pns_clear_command()
+            pns_clear_command(sock)
 
         elif args[1] == 'B':
             # reboot command
             if argc >= 3:
-                pns_reboot_command(args[2])
+                pns_reboot_command(args[2], sock)
 
         elif args[1] == 'G':
             # get status command
-            status_data = pns_get_data_command()
+            status_data = pns_get_data_command(sock)
             # Display acquired data
             print("Response data for status acquisition command")
             # Input1
@@ -733,7 +733,7 @@ def main():
 
         elif args[1] == 'E':
             # get detail status command
-            detail_status_data = pns_get_detail_data_command()
+            detail_status_data = pns_get_detail_data_command(sock)
             # Display acquired data
             print("Response data for status acquisition command")
             # MAC address
@@ -884,11 +884,11 @@ def main():
         elif args[1] == 'W':
             # write command
             if argc >= 3:
-                phn_write_command(int(args[2]))
+                phn_write_command(int(args[2]), sock)
 
         elif args[1] == 'R':
             # read command
-            run_data = phn_read_command()
+            run_data = phn_read_command(sock)
             # Display acquired data
             print("Response data for read command")
             # LED unit flashing
@@ -916,7 +916,7 @@ def main():
 
     finally:
         # Close the socket
-        socket_close()
+        socket_close(sock)
 
 
 def socket_open(ip: str, port: int):
@@ -930,17 +930,19 @@ def socket_open(ip: str, port: int):
     port: int
         port number
     """
-    _sock.connect((ip, port))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((ip, port))
+    return sock
 
-
-def socket_close():
+def socket_close(sock):
     """
     Close the socket.
     """
-    _sock.close()
+    
+    sock.close()
 
 
-def send_command(send_data: bytes) -> bytes:
+def send_command(send_data: bytes, sock) -> bytes:
     """
     Send command
 
@@ -955,15 +957,15 @@ def send_command(send_data: bytes) -> bytes:
         received data
     """
     # Send
-    _sock.send(send_data)
+    sock.send(send_data)
 
     # Receive response data
-    recv_data = _sock.recv(1024)
+    recv_data = sock.recv(1024)
 
     return recv_data
 
 
-def pns_smart_mode_command(run_data: int):
+def pns_smart_mode_command(run_data: int, sock):
     """
     Send smart mode control command for PNS command
 
@@ -984,14 +986,14 @@ def pns_smart_mode_command(run_data: int):
     )
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_mute_command(mute: int):
+def pns_mute_command(mute: int, sock):
     """
     Send mute command for PNS command
 
@@ -1012,14 +1014,14 @@ def pns_mute_command(mute: int):
     )
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_stop_pulse_input_command(input_mode: int):
+def pns_stop_pulse_input_command(input_mode: int, sock):
     """
     Send stop/pulse input command for PNS command
 
@@ -1042,14 +1044,14 @@ def pns_stop_pulse_input_command(input_mode: int):
     )
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_run_control_command(run_control_data: PnsRunControlData):
+def pns_run_control_command(run_control_data: PnsRunControlData, sock):
     """
     Send operation control command for PNS command
 
@@ -1074,14 +1076,14 @@ def pns_run_control_command(run_control_data: PnsRunControlData):
     send_data += run_control_data.get_bytes()
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_detail_run_control_command(detail_run_control_data: PnsDetailRunControlData):
+def pns_detail_run_control_command(detail_run_control_data: PnsDetailRunControlData, sock):
     """
     Send detailed operation control command for PNS command
 
@@ -1105,14 +1107,14 @@ def pns_detail_run_control_command(detail_run_control_data: PnsDetailRunControlD
     send_data += detail_run_control_data.get_bytes()
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_clear_command():
+def pns_clear_command(sock):
     """
     Send clear command for PNS command
 
@@ -1127,14 +1129,14 @@ def pns_clear_command():
     )
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_reboot_command(password: str):
+def pns_reboot_command(password: str, sock):
     """
     Send restart command for PNS command
 
@@ -1156,14 +1158,14 @@ def pns_reboot_command(password: str):
     send_data += pass_data
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
         raise ValueError('negative acknowledge')
 
 
-def pns_get_data_command() -> 'PnsStatusData':
+def pns_get_data_command(sock) -> 'PnsStatusData':
     """
     Send status acquisition command for PNS command
 
@@ -1183,7 +1185,7 @@ def pns_get_data_command() -> 'PnsStatusData':
     )
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
@@ -1194,7 +1196,7 @@ def pns_get_data_command() -> 'PnsStatusData':
     return status_data
 
 
-def pns_get_detail_data_command() -> 'PnsDetailStatusData':
+def pns_get_detail_data_command(sock) -> 'PnsDetailStatusData':
     """
     Send command to get detailed status of PNS command
 
@@ -1214,7 +1216,7 @@ def pns_get_detail_data_command() -> 'PnsDetailStatusData':
     )
 
     # Send PNS command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] == PNS_NAK:
@@ -1225,7 +1227,7 @@ def pns_get_detail_data_command() -> 'PnsDetailStatusData':
     return detail_status_data
 
 
-def phn_write_command(run_data: int):
+def phn_write_command(run_data: int, sock):
     """
     Send PHN command write command
 
@@ -1252,14 +1254,14 @@ def phn_write_command(run_data: int):
     )
 
     # send PHN command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data == PHN_NAK:
         raise ValueError('negative acknowledge')
 
 
-def phn_read_command() -> int:
+def phn_read_command(sock) -> int:
     """
     Send command to read PHN command
 
@@ -1277,7 +1279,7 @@ def phn_read_command() -> int:
     )
 
     # send PHN command
-    recv_data = send_command(send_data)
+    recv_data = send_command(send_data, sock)
 
     # check the response data
     if recv_data[0] != int(PHN_READ_COMMAND.hex(), 16):
